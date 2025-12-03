@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "ES2015",           // modern JS (needed for async/Promise)
+    "module": "ES6",              // allows imports if needed
+    "strict": true,               // strict type checking
+    "outDir": "./dist",           // compiled JS goes here
+    "lib": ["ES2015", "DOM"],     // Promise, fetch, and DOM support
+    "noEmitOnError": true         // don’t emit JS if there’s a TS error
+  },
+  "include": ["./draw.ts"]
+}
