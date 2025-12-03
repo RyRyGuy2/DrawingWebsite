@@ -3,12 +3,23 @@
     <head>
         <meta charset="UTF-8">
 
-        <link rel="stylesheet" href="./style.css"
+        <link rel="stylesheet" href="./style.css">
     </head>
     <body>
-        <input id="brushSize" placeholder="20" type="range" min="1" max="50">Brush Size</input>
-        <button onclick="Reset()">Click Me To Reset screen!</button><br>
-        <canvas id="canvas" width="1080" height="720"></canvas>
+        <div id="container">
+            <div id="controls">
+                <label for="brushSize">Brush Size: <span id="brushSizeLabel">5</span></label>
+                <input id="brushSize" type="range" min="1" max="50" value="5">
+
+                <label for="brushColor">Brush Color:</label>
+                <input id="brushColor" type="color">
+
+            <button onclick="Reset()">Reset Canvas</button>
+        </div>
+
+            <canvas id="canvas" width="800" height="600"></canvas>
+        </div>
+
         <script src="./dist/draw.js"></script>
         
     </body>
