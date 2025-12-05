@@ -6,6 +6,7 @@ const brushSizeInput = document.getElementById("brushSize");
 const brushColorInput = document.getElementById("brushColor");
 const undoButton = document.getElementById("undoButton");
 const toolDisplay = document.getElementById("ToolDisplay");
+const brushSizeText = document.getElementById("brushSizeText");
 // ----- State -----
 let brushColor = brushColorInput.value;
 let mouseDown = false;
@@ -87,6 +88,8 @@ function Fill(newColor, e) {
     const x = pos.x;
     const y = pos.y;
     const ogColor = GetPixelColor(x, y);
+    currentStroke = { snapshot: new Uint8ClampedArray(data) };
+    strokes.push(currentStroke);
     if (ogColor.r === newColor.r &&
         ogColor.g === newColor.g &&
         ogColor.b === newColor.b &&
@@ -137,6 +140,7 @@ function Fill(newColor, e) {
     }
     // Save stroke for undo
     strokes.push({ snapshot: new Uint8ClampedArray(data) });
+    currentStroke = null;
 }
 // ----- Neighbor scanning -----
 function MakePixelAndScan(x, y) {
@@ -196,10 +200,8 @@ canvas.addEventListener("mousemove", (e) => {
 window.addEventListener("keydown", (e) => {
     if (e.key.toLowerCase() === "f")
         SetSelectedTool(SelectedTool.PaintBucket);
-    ;
     if (e.key.toLowerCase() === "b")
         SetSelectedTool(SelectedTool.Brush);
-    ;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z")
         Undo();
 });
@@ -218,6 +220,7 @@ function updateLoop() {
         ctx.putImageData(img, 0, 0);
         needsUpdate = false;
     }
+    brushSizeText.textContent = "Brush Size : " + brushSizeInput.value;
     brushColor = brushColorInput.value;
     requestAnimationFrame(updateLoop);
 }

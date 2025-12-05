@@ -8,7 +8,7 @@
     <body>
         <div id="container">
             <div id="controls">
-                <label for="brushSize">Brush Size: <span id="brushSizeLabel">5</span></label>
+                <h2 id = "brushSizeText"></h2>
                 <input id="brushSize" type="range" min="1" max="50" value="5">
 
                 <label for="brushColor">Brush Color:</label>
@@ -17,7 +17,9 @@
             <button onclick="Reset()">Reset Canvas</button>
             <button onclick="Undo()">Undo</button>
 
-            <h3 id="Tool Display">brush</h3>
+            <h3 id="ToolDisplay">brush<h3>
+
+            <h5>Press B to use brush tool,<br>Press F to use fill tool.</h5>
         </div>
 
             <canvas id="canvas" width="800" height="600"></canvas>
