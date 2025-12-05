@@ -5,14 +5,22 @@ const ctx = canvas.getContext("2d");
 const brushSizeInput = document.getElementById("brushSize");
 const brushColorInput = document.getElementById("brushColor");
 const undoButton = document.getElementById("undoButton");
+const toolDisplay = document.getElementById("ToolDisplay");
+// ----- State -----
 let brushColor = brushColorInput.value;
 let mouseDown = false;
 let needsUpdate = false;
 let img;
 let data;
-let pixelX;
-let pixelY;
-let strokeSnapshot;
+let pixelX = 0;
+let pixelY = 0;
+// Tools
+var SelectedTool;
+(function (SelectedTool) {
+    SelectedTool["Brush"] = "Brush";
+    SelectedTool["PaintBucket"] = "Fill";
+})(SelectedTool || (SelectedTool = {}));
+let selectedTool = SelectedTool.Brush;
 let strokes = [];
 let currentStroke = null;
 // ----- Utilities -----
@@ -28,7 +36,10 @@ function HexToRgba(hex, alpha = 255) {
 function GetBrushColor() {
     return HexToRgba(brushColor, 255);
 }
-// ----- Drawing -----
+function GetPixelColor(x, y) {
+    const index = (y * canvas.width + x) * 4;
+    return { r: data[index], g: data[index + 1], b: data[index + 2], a: data[index + 3] };
+}
 function SetPixel(x, y, color) {
     if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height)
         return;
@@ -39,64 +50,113 @@ function SetPixel(x, y, color) {
     data[index + 3] = color.a;
     needsUpdate = true;
 }
-function DrawBrush(x, y, color) {
-    const brushSize = Number(brushSizeInput.value) || 5;
-    const rSquared = brushSize * brushSize;
-    let points = [];
-    for (let dx = -brushSize; dx <= brushSize; dx++) {
-        for (let dy = -brushSize; dy <= brushSize; dy++) {
-            if (dx * dx + dy * dy <= rSquared) {
-                const px = x + dx;
-                const py = y + dy;
-                points.push({ x: px, y: py, color }); // painted color
-                SetPixel(px, py, color);
-            }
+// ----- Brush -----
+function GetBrushMask(size) {
+    const mask = [];
+    const rSquared = size * size;
+    for (let dx = -size; dx <= size; dx++) {
+        for (let dy = -size; dy <= size; dy++) {
+            if (dx * dx + dy * dy <= rSquared)
+                mask.push({ dx, dy });
         }
     }
-    return points;
+    return mask;
 }
-// ----- Stroke Handling -----
+function DrawBrush(x, y, color) {
+    const size = Number(brushSizeInput.value) || 5;
+    const mask = GetBrushMask(size);
+    for (const { dx, dy } of mask)
+        SetPixel(x + dx, y + dy, color);
+}
 function StartStroke(x, y, color) {
-    currentStroke = {
-        points: [],
-        pointsBelow: [],
-        brushSize: Number(brushSizeInput.value),
-    };
-    // Take snapshot of current canvas
-    strokeSnapshot = new Uint8ClampedArray(data);
+    currentStroke = { snapshot: new Uint8ClampedArray(data) };
     function loop() {
         if (!mouseDown) {
-            if (currentStroke && currentStroke.points.length > 0) {
-                strokes.push(currentStroke);
-            }
+            strokes.push(currentStroke);
             currentStroke = null;
             return;
         }
-        if (!currentStroke)
-            return;
-        const drawn = DrawBrush(pixelX, pixelY, color);
-        for (const p of drawn) {
-            // Only store pointsBelow the first time we draw that pixel
-            if (!currentStroke.pointsBelow.some(bp => bp.x === p.x && bp.y === p.y)) {
-                const index = (p.y * canvas.width + p.x) * 4;
-                currentStroke.pointsBelow.push({
-                    x: p.x,
-                    y: p.y,
-                    color: {
-                        r: strokeSnapshot[index],
-                        g: strokeSnapshot[index + 1],
-                        b: strokeSnapshot[index + 2],
-                        a: strokeSnapshot[index + 3],
-                    },
-                });
-            }
-            currentStroke.points.push({ x: p.x, y: p.y, color });
-        }
+        DrawBrush(pixelX, pixelY, color);
         requestAnimationFrame(loop);
     }
     loop();
 }
-// ----- Mouse Handling -----
+// ----- Flood Fill (Paint Bucket) -----
+function Fill(newColor, e) {
+    const pos = getMousePos(e);
+    const x = pos.x;
+    const y = pos.y;
+    const ogColor = GetPixelColor(x, y);
+    if (ogColor.r === newColor.r &&
+        ogColor.g === newColor.g &&
+        ogColor.b === newColor.b &&
+        ogColor.a === newColor.a)
+        return;
+    const stack = [];
+    stack.push({ x, y, color: ogColor });
+    while (stack.length > 0) {
+        const p = stack.pop();
+        const px = p.x;
+        const py = p.y;
+        const curColor = GetPixelColor(px, py);
+        // Fill if it's white OR original color
+        const isWhite = curColor.r === 255 &&
+            curColor.g === 255 &&
+            curColor.b === 255 &&
+            curColor.a === 255;
+        const isOriginal = curColor.r === ogColor.r &&
+            curColor.g === ogColor.g &&
+            curColor.b === ogColor.b &&
+            curColor.a === ogColor.a;
+        if (!isWhite && !isOriginal)
+            continue;
+        if (curColor.r === newColor.r &&
+            curColor.g === newColor.g &&
+            curColor.b === newColor.b &&
+            curColor.a === newColor.a)
+            continue;
+        SetPixel(px, py, newColor);
+        const neighbors = MakePixelAndScan(px, py);
+        for (const n of neighbors) {
+            if (!n)
+                continue;
+            if (n.x < 0 || n.x >= canvas.width || n.y < 0 || n.y >= canvas.height)
+                continue;
+            const neighColor = n.color;
+            const neighIsWhite = neighColor.r === 255 &&
+                neighColor.g === 255 &&
+                neighColor.b === 255 &&
+                neighColor.a === 255;
+            const neighIsOriginal = neighColor.r === ogColor.r &&
+                neighColor.g === ogColor.g &&
+                neighColor.b === ogColor.b &&
+                neighColor.a === ogColor.a;
+            if (neighIsWhite || neighIsOriginal)
+                stack.push(n);
+        }
+    }
+    // Save stroke for undo
+    strokes.push({ snapshot: new Uint8ClampedArray(data) });
+}
+// ----- Neighbor scanning -----
+function MakePixelAndScan(x, y) {
+    const points = [];
+    const neighbors = [
+        { x: x - 1, y: y }, // left
+        { x: x + 1, y: y }, // right
+        { x: x, y: y - 1 }, // up
+        { x: x, y: y + 1 }, // down
+    ];
+    for (const n of neighbors) {
+        if (n.x < 0 || n.x >= canvas.width)
+            continue;
+        if (n.y < 0 || n.y >= canvas.height)
+            continue;
+        points.push({ x: n.x, y: n.y, color: GetPixelColor(n.x, n.y) });
+    }
+    return points;
+}
+// ----- Mouse -----
 function getMousePos(e) {
     const rect = canvas.getBoundingClientRect();
     return {
@@ -111,32 +171,47 @@ function DrawAtMouse(e, newStroke) {
     if (newStroke)
         StartStroke(x, y, GetBrushColor());
 }
+function SetSelectedTool(tool) {
+    selectedTool = tool;
+    if (toolDisplay)
+        toolDisplay.textContent = tool;
+}
+// ----- Event Listeners -----
 canvas.addEventListener("mousedown", (e) => {
-    mouseDown = true;
-    DrawAtMouse(e, true);
+    if (selectedTool === SelectedTool.Brush) {
+        mouseDown = true;
+        DrawAtMouse(e, true);
+    }
+    else if (selectedTool === SelectedTool.PaintBucket) {
+        Fill(GetBrushColor(), e);
+    }
+    toolDisplay.textContent = selectedTool;
 });
 canvas.addEventListener("mouseup", () => (mouseDown = false));
 canvas.addEventListener("mouseleave", () => (mouseDown = false));
 canvas.addEventListener("mousemove", (e) => {
-    if (mouseDown)
+    if (mouseDown && selectedTool === SelectedTool.Brush)
         DrawAtMouse(e, false);
 });
+window.addEventListener("keydown", (e) => {
+    if (e.key.toLowerCase() === "f")
+        SetSelectedTool(SelectedTool.PaintBucket);
+    ;
+    if (e.key.toLowerCase() === "b")
+        SetSelectedTool(SelectedTool.Brush);
+    ;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z")
+        Undo();
+});
+undoButton === null || undoButton === void 0 ? void 0 : undoButton.addEventListener("click", Undo);
 // ----- Undo -----
 function Undo() {
     if (strokes.length === 0)
         return;
     const strokeToUndo = strokes.pop();
-    for (const p of strokeToUndo.pointsBelow) {
-        SetPixel(p.x, p.y, p.color);
-    }
-    ctx.putImageData(img, 0, 0);
+    data.set(strokeToUndo.snapshot);
+    needsUpdate = true;
 }
-window.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-        Undo();
-    }
-});
-undoButton === null || undoButton === void 0 ? void 0 : undoButton.addEventListener("click", Undo);
 // ----- Canvas Update -----
 function updateLoop() {
     if (needsUpdate) {
@@ -159,4 +234,5 @@ window.Reset = Reset;
 window.onload = () => {
     Reset();
     updateLoop();
+    SetSelectedTool(SelectedTool.Brush);
 };
