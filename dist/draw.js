@@ -7,6 +7,31 @@ const brushColorInput = document.getElementById("brushColor");
 const undoButton = document.getElementById("undoButton");
 const toolDisplay = document.getElementById("ToolDisplay");
 const brushSizeText = document.getElementById("brushSizeText");
+/*
+    Implementatino of the interpolation.
+
+    track the two points of each stroke.
+
+    get delta values
+
+    (x2 - x1, y2-y1)
+
+    Hypotinuse length
+
+    a^2+b^2=c^2
+
+    check if its viable to calculate the distance
+    get the magnitude and normalize
+
+    x, y/ sqrt c
+
+    loop through the length of the hypotinuse
+    
+    multiply the vector by the iterator to get the point along the slope
+
+    run the brush function with those points.
+
+*/
 // ----- State -----
 let brushColor = brushColorInput.value;
 let mouseDown = false;
@@ -69,18 +94,43 @@ function DrawBrush(x, y, color) {
     for (const { dx, dy } of mask)
         SetPixel(x + dx, y + dy, color);
 }
+let previousPoint = null;
+let currentPoint = null;
 function StartStroke(x, y, color) {
     currentStroke = { snapshot: new Uint8ClampedArray(data) };
     function loop() {
         if (!mouseDown) {
             strokes.push(currentStroke);
             currentStroke = null;
+            previousPoint = null;
+            currentPoint = null;
             return;
         }
+        if (previousPoint == null) {
+            previousPoint = { x: pixelX, y: pixelY, color: color };
+        }
+        currentPoint = { x: pixelX, y: pixelY, color: color };
         DrawBrush(pixelX, pixelY, color);
+        PointsToInterpolate(currentPoint, previousPoint, color);
+        previousPoint = { x: pixelX, y: pixelY, color: color };
         requestAnimationFrame(loop);
     }
     loop();
+}
+function PointsToInterpolate(p1, p2, color) {
+    let dx = p2.x - p1.x;
+    let dy = p2.y - p1.y;
+    let dst = Math.sqrt(dx * dx + dy * dy);
+    // Avoid div0
+    if (dst < 1)
+        return;
+    let normalizedx = dx / dst;
+    let normalizedy = dy / dst;
+    for (let i = 0; i < dst; i++) {
+        let x = p1.x + normalizedx * i;
+        let y = p1.y + normalizedy * i;
+        DrawBrush(Math.round(x), Math.round(y), color);
+    }
 }
 // ----- Flood Fill (Paint Bucket) -----
 function Fill(newColor, e) {
