@@ -9,8 +9,37 @@ const brushColorInput = document.getElementById("brushColor") as HTMLInputElemen
 const undoButton = document.getElementById("undoButton") as HTMLButtonElement;
 const toolDisplay = document.getElementById("ToolDisplay");
 const brushSizeText = document.getElementById("brushSizeText")
+let c: number;
+let b: number;
+let a = c!*c! + b!*b!;
 
 
+/*
+    Implementation of the interpolation.
+
+    track the two points of each stroke. 
+
+    get the delta values of them
+    (x2-x1, y2-y1).
+
+    Take the hypotinuse length
+
+    a^2 + b^2 = c^2
+
+    check if its viable to calculate the distance
+
+    Get the magnitude
+    and normalize
+
+    x, y / sqrt c
+
+    loop through the length of the hypotinuse
+
+    multiply the vector by the iterator to get the point along the slope
+
+    run the brush function. 
+
+*/
 // ----- State -----
 let brushColor = brushColorInput.value;
 let mouseDown = false;
