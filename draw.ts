@@ -10,66 +10,8 @@ const brushColorInput = document.getElementById("brushColor") as HTMLInputElemen
 const undoButton = document.getElementById("undoButton") as HTMLButtonElement;
 const toolDisplay = document.getElementById("ToolDisplay");
 const brushSizeText = document.getElementById("brushSizeText")
-let c: number;
-let b: number;
-let a = c!*c! + b!*b!;
-
-/*
-    Implementatino of the interpolation.
-
-    track the two points of each stroke.
-
-    get delta values
-
-    (x2 - x1, y2-y1)
-
-    Hypotinuse length
-
-    a^2+b^2=c^2
-
-    check if its viable to calculate the distance
-    get the magnitude and normalize
-
-    x, y/ sqrt c
-
-    loop through the length of the hypotinuse
-    
-    multiply the vector by the iterator to get the point along the slope
-
-    run the brush function with those points.
-
-*/
 
 
-
-
-
-/*
-    Implementation of the interpolation.
-
-    track the two points of each stroke. 
-
-    get the delta values of them
-    (x2-x1, y2-y1).
-
-    Take the hypotinuse length
-
-    a^2 + b^2 = c^2
-
-    check if its viable to calculate the distance
-
-    Get the magnitude
-    and normalize
-
-    x, y / sqrt c
-
-    loop through the length of the hypotinuse
-
-    multiply the vector by the iterator to get the point along the slope
-
-    run the brush function. 
-
-*/
 // ----- State -----
 let brushColor = brushColorInput.value;
 let mouseDown = false;
@@ -82,7 +24,8 @@ let pixelY = 0;
 // Tools
 enum SelectedTool {
     Brush = "Brush",
-    PaintBucket = "Fill"
+    PaintBucket = "Fill",
+    Line = "Line"
 }
 let selectedTool: SelectedTool = SelectedTool.Brush;
 
@@ -157,7 +100,7 @@ function StartStroke(x: number, y: number, color: rgba) {
         currentPoint = {x: pixelX, y: pixelY, color: color}
 
         DrawBrush(pixelX, pixelY, color);
-        PointsToInterpolate(currentPoint, previousPoint, color);
+        PointsToInterpolate(currentPoint, previousPoint, color); // ensures a smooth line
         
         previousPoint = {x: pixelX, y: pixelY, color: color}
         requestAnimationFrame(loop);
@@ -166,7 +109,9 @@ function StartStroke(x: number, y: number, color: rgba) {
     loop();
 }
 
-function PointsToInterpolate(p1: point, p2: point, color: rgba) {
+function PointsToInterpolate(p1: point | null, p2: point | null, color: rgba) {
+
+    if (p1 === null || p2 === null) return;
     let dx = p2.x - p1.x;
     let dy = p2.y - p1.y;
     let dst = Math.sqrt(dx*dx + dy*dy);
@@ -182,6 +127,47 @@ function PointsToInterpolate(p1: point, p2: point, color: rgba) {
         let y = p1.y + normalizedy * i;
         DrawBrush(Math.round(x), Math.round(y), color);
     }
+}
+
+let linePoint1: point | null;
+let linePoint2: point | null;
+let snapshot: Uint8ClampedArray | null;
+let mouseEvent: MouseEvent | null;
+type vector2 = {
+    x: number,
+    y: number
+}
+let previousMousePos: vector2 | null;
+let mousePos: vector2 | null;
+
+function Line() {
+    if (mouseEvent != null) mousePos = getMousePos(mouseEvent!);
+    previousMousePos = mousePos;
+    currentStroke = { snapshot: new Uint8ClampedArray(data)};
+    snapshot = new Uint8ClampedArray(data);
+
+    function loop() {
+        mousePos = getMousePos(mouseEvent!);
+
+        if (previousMousePos != mousePos) {
+            data.set(snapshot!)
+            PointsToInterpolate(linePoint1, {x: mousePos!.x, y: mousePos!.y, color: GetBrushColor()}, GetBrushColor()); // temp line
+        }
+
+        if (linePoint2 != null) {
+            
+            PointsToInterpolate(linePoint1, linePoint2, GetBrushColor());
+            strokes.push(currentStroke!);
+            currentStroke = null;
+            linePoint1 = null;
+            linePoint2 = null;
+
+
+        } else {
+            requestAnimationFrame(loop);
+        }
+    }
+    loop();
 }
 
 // ----- Flood Fill (Paint Bucket) -----
@@ -273,7 +259,6 @@ function MakePixelAndScan(x: number, y: number): point[] {
     }
     return points;
 }
-
 // ----- Mouse -----
 function getMousePos(e: MouseEvent) {
     const rect = canvas.getBoundingClientRect();
@@ -282,41 +267,62 @@ function getMousePos(e: MouseEvent) {
         y: Math.floor((e.clientY - rect.top) * (canvas.height / rect.height)),
     };
 }
-
 function DrawAtMouse(e: MouseEvent, newStroke: boolean) {
     const { x, y } = getMousePos(e);
     pixelX = x;
     pixelY = y;
     if (newStroke) StartStroke(x, y, GetBrushColor());
 }
-
 function SetSelectedTool(tool: SelectedTool) {
     selectedTool = tool;
-    if (toolDisplay) toolDisplay.textContent = tool;
+    if (toolDisplay) toolDisplay.textContent = "Selected tool:" + tool;
 }
 
 // ----- Event Listeners -----
 canvas.addEventListener("mousedown", (e) => {
+    mouseDown = true;
     if (selectedTool === SelectedTool.Brush) {
-        mouseDown = true;
         DrawAtMouse(e, true);
     } else if (selectedTool === SelectedTool.PaintBucket) {
         Fill(GetBrushColor(), e);
+    } else if (selectedTool === SelectedTool.Line) {
+        mouseEvent = e;
+        linePoint1 = {
+            x: getMousePos(e).x,
+            y: getMousePos(e).y,
+            color: GetBrushColor()
+        }
+        Line();
         
     }
 
     
     toolDisplay!.textContent = selectedTool;
 });
-canvas.addEventListener("mouseup", () => (mouseDown = false));
+canvas.addEventListener("mouseup", (e) => {
+    mouseDown = false;
+    
+    if (selectedTool === SelectedTool.Line) {
+        linePoint2 = {
+            x: getMousePos(e).x,
+            y: getMousePos(e).y,
+            color: GetBrushColor()
+        }
+        mouseEvent = e;
+        
+
+    }
+}); 
 canvas.addEventListener("mouseleave", () => (mouseDown = false));
 canvas.addEventListener("mousemove", (e) => {
     if (mouseDown && selectedTool === SelectedTool.Brush) DrawAtMouse(e, false);
+    if (selectedTool === SelectedTool.Line) mouseEvent = e;
 });
 
 window.addEventListener("keydown", (e) => {
     if (e.key.toLowerCase() === "f") SetSelectedTool(SelectedTool.PaintBucket);
     if (e.key.toLowerCase() === "b") SetSelectedTool(SelectedTool.Brush);
+    if (e.key.toLowerCase() === "l") SetSelectedTool(SelectedTool.Line);
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") Undo();
 });
 
@@ -325,20 +331,29 @@ undoButton?.addEventListener("click", Undo);
 // ----- Undo -----
 function Undo() {
     if (strokes.length === 0) return;
+
     const strokeToUndo = strokes.pop()!;
     data.set(strokeToUndo.snapshot);
     needsUpdate = true;
+
+    // --- FIX: Reset line tool state ---
+    linePoint1 = null;
+    linePoint2 = null;
+    snapshot = null;
+    mouseEvent = null;
+    previousMousePos = null;
+    currentStroke = null;
 }
 
 // ----- Canvas Update -----
-function updateLoop() {
+function UpdateLoop() {
     if (needsUpdate) {
         ctx.putImageData(img, 0, 0);
         needsUpdate = false;
     }
     brushSizeText!.textContent = "Brush Size : " + brushSizeInput.value;
     brushColor = brushColorInput.value;
-    requestAnimationFrame(updateLoop);
+    requestAnimationFrame(UpdateLoop);
 }
 
 // ----- Reset -----
@@ -355,7 +370,7 @@ function Reset() {
 // ----- Initialize -----
 window.onload = () => {
     Reset();
-    updateLoop();
+    UpdateLoop();
     SetSelectedTool(SelectedTool.Brush);
     
 };
