@@ -21,6 +21,7 @@ var SelectedTool;
     SelectedTool["Brush"] = "Brush";
     SelectedTool["PaintBucket"] = "Fill";
     SelectedTool["Line"] = "Line";
+    SelectedTool["Circle"] = "Circle";
 })(SelectedTool || (SelectedTool = {}));
 let selectedTool = SelectedTool.Brush;
 let strokes = [];
@@ -126,7 +127,7 @@ function Line() {
         mousePos = getMousePos(mouseEvent);
         if (previousMousePos != mousePos) {
             data.set(snapshot);
-            PointsToInterpolate(linePoint1, { x: mousePos.x, y: mousePos.y, color: GetBrushColor() }, GetBrushColor()); // temp line
+            PointsToInterpolate(linePoint1, { x: mousePos.x, y: mousePos.y }, GetBrushColor()); // temp line
         }
         if (linePoint2 != null) {
             PointsToInterpolate(linePoint1, linePoint2, GetBrushColor());
@@ -197,8 +198,6 @@ function Fill(newColor, e) {
                 stack.push(n);
         }
     }
-    // Save stroke for undo
-    strokes.push({ snapshot: new Uint8ClampedArray(data) });
     currentStroke = null;
 }
 // ----- Neighbor scanning -----
@@ -239,6 +238,62 @@ function SetSelectedTool(tool) {
     if (toolDisplay)
         toolDisplay.textContent = "Selected tool:" + tool;
 }
+function DegreesToRad(degrees) {
+    return degrees * (Math.PI / 180);
+}
+let circlePoint1;
+let circlePoint2;
+//let snapshot: Uint8ClampedArray | null; reuse this
+//let mouseEvent: MouseEvent | null; reuse this
+//let previousMousePos: vector2 | null; reuse
+//let mousePos: vector2 | null; ruese
+function Circle() {
+    if (mouseEvent != null)
+        mousePos = getMousePos(mouseEvent);
+    previousMousePos = mousePos;
+    currentStroke = { snapshot: new Uint8ClampedArray(data) };
+    snapshot = new Uint8ClampedArray(data);
+    function loop() {
+        mousePos = getMousePos(mouseEvent);
+        if (previousMousePos != mousePos) {
+            data.set(snapshot);
+            DrawCircle(circlePoint1, { x: mousePos.x, y: mousePos.y }); // temp line
+        }
+        if (circlePoint1 != null && circlePoint2 != null) {
+            DrawCircle(circlePoint1, circlePoint2);
+            strokes.push(currentStroke);
+            circlePoint1 = null;
+            circlePoint2 = null;
+        }
+        else {
+            requestAnimationFrame(loop);
+        }
+    }
+    loop();
+}
+function DrawCircle(p1, p2) {
+    let dx = p2.x - p1.x;
+    let dy = p2.y - p1.y;
+    let dst = Math.sqrt(dx * dx + dy * dy);
+    let circPoints = [];
+    // loop through 90 degrees of circle
+    for (let i = 0; i < 90; i++) {
+        let rad = DegreesToRad(i);
+        let vector = { x: p1.x + Math.cos(rad) * dst, y: p1.y + Math.sin(rad) * dst };
+        circPoints.push(vector);
+    }
+    let allPoints = [];
+    for (const point of circPoints) {
+        allPoints.push(point); // original point
+        allPoints.push({ x: p1.x - (point.x - p1.x), y: point.y }); // mirror left
+        allPoints.push({ x: p1.x - (point.x - p1.x), y: p1.y - (point.y - p1.y) }); // mirror bottom-left
+        allPoints.push({ x: point.x, y: p1.y - (point.y - p1.y) }); // mirror bottom-right
+    }
+    for (const point of allPoints) {
+        DrawBrush(Math.round(point.x), Math.round(point.y), GetBrushColor());
+    }
+    circPoints = null;
+}
 // ----- Event Listeners -----
 canvas.addEventListener("mousedown", (e) => {
     mouseDown = true;
@@ -252,10 +307,14 @@ canvas.addEventListener("mousedown", (e) => {
         mouseEvent = e;
         linePoint1 = {
             x: getMousePos(e).x,
-            y: getMousePos(e).y,
-            color: GetBrushColor()
+            y: getMousePos(e).y
         };
         Line();
+    }
+    else if (selectedTool === SelectedTool.Circle) {
+        mouseEvent = e;
+        circlePoint1 = getMousePos(e);
+        Circle();
     }
     toolDisplay.textContent = selectedTool;
 });
@@ -264,8 +323,14 @@ canvas.addEventListener("mouseup", (e) => {
     if (selectedTool === SelectedTool.Line) {
         linePoint2 = {
             x: getMousePos(e).x,
-            y: getMousePos(e).y,
-            color: GetBrushColor()
+            y: getMousePos(e).y
+        };
+        mouseEvent = e;
+    }
+    if (selectedTool === SelectedTool.Circle) {
+        circlePoint2 = {
+            x: getMousePos(e).x,
+            y: getMousePos(e).y
         };
         mouseEvent = e;
     }
@@ -276,6 +341,8 @@ canvas.addEventListener("mousemove", (e) => {
         DrawAtMouse(e, false);
     if (selectedTool === SelectedTool.Line)
         mouseEvent = e;
+    if (selectedTool === SelectedTool.Circle)
+        mouseEvent = e;
 });
 window.addEventListener("keydown", (e) => {
     if (e.key.toLowerCase() === "f")
@@ -284,6 +351,8 @@ window.addEventListener("keydown", (e) => {
         SetSelectedTool(SelectedTool.Brush);
     if (e.key.toLowerCase() === "l")
         SetSelectedTool(SelectedTool.Line);
+    if (e.key.toLowerCase() === "c")
+        SetSelectedTool(SelectedTool.Circle);
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z")
         Undo();
 });
