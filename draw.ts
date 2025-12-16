@@ -26,7 +26,8 @@ enum SelectedTool {
     Brush = "Brush",
     PaintBucket = "Fill",
     Line = "Line",
-    Circle = "Circle"
+    Circle = "Circle",
+    Box = "Box"
 }
 let selectedTool: SelectedTool = SelectedTool.Brush;
 
@@ -300,12 +301,12 @@ function Circle() {
 
         if (previousMousePos != mousePos) {
             data.set(snapshot!)
-            DrawCircle(circlePoint1!, {x: mousePos!.x, y: mousePos!.y}); // temp line
+            DrawCircle(circlePoint1!, {x: mousePos!.x, y: mousePos!.y}, 45); // temp line
         }
 
         if (circlePoint1 != null && circlePoint2 != null) {
            
-            DrawCircle(circlePoint1, circlePoint2);
+            DrawCircle(circlePoint1, circlePoint2, 180);
             strokes.push(currentStroke!);
             circlePoint1 = null;
             circlePoint2 = null;
@@ -319,15 +320,16 @@ function Circle() {
     loop();
 }
 
-function DrawCircle(p1: vector2, p2: vector2) {
+function DrawCircle(p1: vector2, p2: vector2, quality: number = 90) {
     let dx = p2.x - p1.x;
             let dy = p2.y - p1.y;
             let dst = Math.sqrt(dx*dx + dy*dy);
             let circPoints: vector2[] | null = [];
 
             // loop through 90 degrees of circle
-            for (let i = 0; i < 90; i++) {
-                let rad = DegreesToRad(i)
+            for (let i = 0; i < quality; i++) {
+                let divisor = quality/90;
+                let rad = DegreesToRad(i/divisor);
                 let vector: vector2 = {x: p1.x + Math.cos(rad) * dst, y: p1.y +  Math.sin(rad) * dst}
                 circPoints.push(vector);
             }
@@ -342,7 +344,8 @@ function DrawCircle(p1: vector2, p2: vector2) {
 
             }
 
-            for (const point of allPoints) {
+            for (let i = 0; i < allPoints.length; i++) {
+                const point = allPoints[i];
                 DrawBrush(Math.round(point.x), Math.round(point.y), GetBrushColor());
             }
             circPoints = null;
@@ -401,6 +404,7 @@ window.addEventListener("keydown", (e) => {
     if (e.key.toLowerCase() === "b") SetSelectedTool(SelectedTool.Brush);
     if (e.key.toLowerCase() === "l") SetSelectedTool(SelectedTool.Line);
     if (e.key.toLowerCase() === "c") SetSelectedTool(SelectedTool.Circle);
+    if (e.key.toLowerCase)
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") Undo();
 });
 

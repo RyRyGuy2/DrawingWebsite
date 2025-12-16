@@ -22,6 +22,7 @@ var SelectedTool;
     SelectedTool["PaintBucket"] = "Fill";
     SelectedTool["Line"] = "Line";
     SelectedTool["Circle"] = "Circle";
+    SelectedTool["Box"] = "Box";
 })(SelectedTool || (SelectedTool = {}));
 let selectedTool = SelectedTool.Brush;
 let strokes = [];
@@ -257,10 +258,10 @@ function Circle() {
         mousePos = getMousePos(mouseEvent);
         if (previousMousePos != mousePos) {
             data.set(snapshot);
-            DrawCircle(circlePoint1, { x: mousePos.x, y: mousePos.y }); // temp line
+            DrawCircle(circlePoint1, { x: mousePos.x, y: mousePos.y }, 45); // temp line
         }
         if (circlePoint1 != null && circlePoint2 != null) {
-            DrawCircle(circlePoint1, circlePoint2);
+            DrawCircle(circlePoint1, circlePoint2, 180);
             strokes.push(currentStroke);
             circlePoint1 = null;
             circlePoint2 = null;
@@ -271,14 +272,15 @@ function Circle() {
     }
     loop();
 }
-function DrawCircle(p1, p2) {
+function DrawCircle(p1, p2, quality = 90) {
     let dx = p2.x - p1.x;
     let dy = p2.y - p1.y;
     let dst = Math.sqrt(dx * dx + dy * dy);
     let circPoints = [];
     // loop through 90 degrees of circle
-    for (let i = 0; i < 90; i++) {
-        let rad = DegreesToRad(i);
+    for (let i = 0; i < quality; i++) {
+        let divisor = quality / 90;
+        let rad = DegreesToRad(i / divisor);
         let vector = { x: p1.x + Math.cos(rad) * dst, y: p1.y + Math.sin(rad) * dst };
         circPoints.push(vector);
     }
@@ -289,7 +291,8 @@ function DrawCircle(p1, p2) {
         allPoints.push({ x: p1.x - (point.x - p1.x), y: p1.y - (point.y - p1.y) }); // mirror bottom-left
         allPoints.push({ x: point.x, y: p1.y - (point.y - p1.y) }); // mirror bottom-right
     }
-    for (const point of allPoints) {
+    for (let i = 0; i < allPoints.length; i++) {
+        const point = allPoints[i];
         DrawBrush(Math.round(point.x), Math.round(point.y), GetBrushColor());
     }
     circPoints = null;
@@ -353,8 +356,9 @@ window.addEventListener("keydown", (e) => {
         SetSelectedTool(SelectedTool.Line);
     if (e.key.toLowerCase() === "c")
         SetSelectedTool(SelectedTool.Circle);
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z")
-        Undo();
+    if (e.key.toLowerCase)
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z")
+            Undo();
 });
 undoButton === null || undoButton === void 0 ? void 0 : undoButton.addEventListener("click", Undo);
 // ----- Undo -----
