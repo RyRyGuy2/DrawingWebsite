@@ -1,3 +1,5 @@
+
+
 type rgba = { r: number; g: number; b: number; a: number };
 type point = { x: number; y: number; color: rgba };
 
@@ -9,7 +11,10 @@ const brushSizeInput = document.getElementById("brushSize") as HTMLInputElement;
 const brushColorInput = document.getElementById("brushColor") as HTMLInputElement;
 const undoButton = document.getElementById("undoButton") as HTMLButtonElement;
 const toolDisplay = document.getElementById("ToolDisplay");
-const brushSizeText = document.getElementById("brushSizeText")
+const brushSizeText = document.getElementById("brushSizeText");
+
+const fileUpload = document.getElementById("fileUpload");
+const recenterButton = document.getElementById("button");
 
 
 // ----- State -----
@@ -37,6 +42,37 @@ let strokes: Stroke[] = [];
 let currentStroke: Stroke | null = null;
 
 // ----- Utilities -----
+
+function imageFileToUint8ClampedArray(
+  file: File
+): Promise<{ data: Uint8ClampedArray; width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject("Canvas not supported");
+
+      ctx.drawImage(img, 0, 0);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      resolve({
+        data: imageData.data, // Uint8ClampedArray
+        width: canvas.width,
+        height: canvas.height,
+      });
+    };
+
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 function HexToRgba(hex: string, alpha: number = 255): rgba {
     hex = hex.replace(/^#/, "");
     if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");

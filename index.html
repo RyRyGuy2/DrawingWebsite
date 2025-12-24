@@ -16,7 +16,18 @@
 
             <button onclick="Reset()">Reset Canvas</button>
             <button onclick="Undo()">Undo</button>
+            
+            <label style="display:flex; gap:8px; align-items:center;">
+                Import:
+                <input
+                id="fileUpload"
+                type="file"
+                accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                />
+            </label>
 
+            <button id="placeCenterBtn" type="button">Place Center</button>
+            
             <h3 id="ToolDisplay">Selected Tool: Brush<h3>
 
             <h5>Press B to use brush tool,<br>Press F to use fill tool.<br> Press L to use line tool<br> Press C for circle tool</h5>
